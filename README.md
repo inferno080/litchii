@@ -1,4 +1,4 @@
-# mental-gym
+# litchii
 Mindful living in the time of AI Slop
 
 ## Project structure
@@ -14,3 +14,7 @@ Mindful living in the time of AI Slop
 3. In another terminal run `cd client && npm run dev`.
 
 The client runs on `http://localhost:5173`; requests to `/api` are proxied to the Nest server at `http://localhost:3000`.
+
+## API documentation
+
+With the server running, open `http://localhost:3000/api/docs` for Swagger UI. Use the **Authorize** button with a Supabase access token before calling protected endpoints.
