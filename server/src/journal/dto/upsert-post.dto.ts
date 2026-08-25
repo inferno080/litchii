@@ -14,4 +14,10 @@ export class UpsertPostDto {
   @IsString()
   @MaxLength(64)
   icon?: string | null;
+
+  @ApiPropertyOptional({ example: 'A quiet Thursday', maxLength: 200 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  title?: string | null;
 }

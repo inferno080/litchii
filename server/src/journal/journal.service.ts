@@ -90,6 +90,7 @@ export class JournalService {
       id: post.id,
       date: post.entryDate,
       icon: post.icon,
+      title: post.title,
       content: post.content,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
@@ -117,12 +118,14 @@ export class JournalService {
     if (post) {
       post.content = dto.content;
       post.icon = dto.icon ?? null;
+      post.title = dto.title ?? null;
     } else {
       post = this.postsRepository.create({
         authorId: profile.id,
         entryDate: date,
         content: dto.content,
         icon: dto.icon ?? null,
+        title: dto.title ?? null,
       });
     }
 

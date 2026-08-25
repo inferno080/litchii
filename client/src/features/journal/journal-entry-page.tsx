@@ -1,29 +1,39 @@
 import { useEffect, useRef, useState } from 'react'
 import type { OutputData } from '@editorjs/editorjs'
 import EditorJS from '@editorjs/editorjs'
+import CodeCup from '@calumk/editorjs-codecup'
+import Checklist from '@editorjs/checklist'
+import Delimiter from '@editorjs/delimiter'
 import Header from '@editorjs/header'
 import ImageTool from '@editorjs/image'
+import InlineCode from '@editorjs/inline-code'
 import LinkTool from '@editorjs/link'
 import List from '@editorjs/list'
+import Marker from '@editorjs/marker'
+import Quote from '@editorjs/quote'
+import Table from '@editorjs/table'
+import Underline from '@editorjs/underline'
 import { EmojiPicker } from 'frimousse'
-import { Box, Button, HStack, Spinner, Stack, Text } from '@chakra-ui/react'
+import { Box, Button, HStack, Input, Spinner, Stack, Text } from '@chakra-ui/react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ThemeToggle } from '../../components/ui/theme-toggle'
 import { toaster } from '../../components/ui/toaster'
 import { apiUrl, supabase } from '../../lib/supabase'
 
-type JournalEntry = { content: OutputData; icon: string | null; author: { username: string } }
+type JournalEntry = { content: OutputData; icon: string | null; title: string | null; author: { username: string } }
 
 const emptyDocument: OutputData = { time: Date.now(), blocks: [], version: '2.30.0' }
 
 export function JournalEntryPage() {
   const navigate = useNavigate()
   const { username = '', date = '' } = useParams()
+  const defaultTitle = new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { dateStyle: 'full' })
   const editorHolder = useRef<HTMLDivElement>(null)
   const editor = useRef<EditorJS | null>(null)
   const [entry, setEntry] = useState<JournalEntry | null>(null)
   const [document, setDocument] = useState<OutputData>(emptyDocument)
   const [icon, setIcon] = useState('')
+  const [title, setTitle] = useState(defaultTitle)
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
   const [canEdit, setCanEdit] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -39,6 +49,7 @@ export function JournalEntryPage() {
           setEntry(loadedEntry)
           setDocument(loadedEntry.content)
           setIcon(loadedEntry.icon ?? '')
+          setTitle(loadedEntry.title ?? defaultTitle)
         } else if (entryResponse.status !== 404) {
           throw new Error('Unable to load this journal entry.')
         }
@@ -59,7 +70,7 @@ export function JournalEntryPage() {
       }
     }
     void loadEntry()
-  }, [date, username])
+  }, [date, defaultTitle, username])
 
   useEffect(() => {
     if (isLoading || error || !editorHolder.current) return
@@ -69,13 +80,23 @@ export function JournalEntryPage() {
       data: document,
       autofocus: canEdit,
       placeholder: canEdit ? 'Start writing...' : undefined,
+      inlineToolbar: canEdit,
       tools: {
-        header: Header,
+        header: { class: Header, config: { levels: [1, 2, 3, 4], defaultLevel: 2 } },
         list: List,
+        code: CodeCup,
+        checklist: Checklist,
+        delimiter: Delimiter,
+        quote: Quote,
+        table: Table,
+        marker: Marker,
+        inlineCode: InlineCode,
+        underline: Underline,
         linkTool: LinkTool,
         image: {
           class: ImageTool,
           config: {
+            features: { caption: false },
             uploader: {
               uploadByUrl: async (url: string) => ({ success: 1, file: { url } }),
               uploadByFile: async (file: File) => {
@@ -114,10 +135,10 @@ export function JournalEntryPage() {
       const response = await fetch(`${apiUrl}/${encodeURIComponent(username)}/${date}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${data.session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, icon: icon || null }),
+        body: JSON.stringify({ content, icon: icon || null, title: title.trim() || defaultTitle }),
       })
       if (!response.ok) throw new Error('Unable to save this journal entry.')
-      setEntry((currentEntry) => ({ ...(currentEntry ?? { author: { username } }), content, icon: icon || null }))
+      setEntry((currentEntry) => ({ ...(currentEntry ?? { author: { username } }), content, icon: icon || null, title: title.trim() || defaultTitle }))
       toaster.create({ description: 'Journal entry saved.', type: 'success' })
     } catch (saveError) {
       toaster.create({ description: saveError instanceof Error ? saveError.message : 'Unable to save this journal entry.', type: 'error' })
@@ -130,8 +151,8 @@ export function JournalEntryPage() {
   if (error) return <Text p="8">{error}</Text>
 
   return <Box minH="100vh" bg="bg.subtle" px={{ base: '4', md: '8' }} py={{ base: '4', md: '8' }}>
-    <Stack maxW="4xl" mx="auto" gap="6">
-      <HStack justify="space-between" borderBottomWidth="1px" borderColor="gray.200" pb="4">
+    <Stack w="full" gap="6" minH={{ base: 'calc(100vh - 4rem)', md: 'calc(100vh - 4rem)' }}>
+      <HStack justify="space-between" borderBottomWidth="0.5px" borderColor="gray.100" pb="2">
         <Button variant="ghost" onClick={() => navigate(`/${username}`)}>&larr; Calendar</Button>
         <HStack gap="2">
           <ThemeToggle />
@@ -152,9 +173,9 @@ export function JournalEntryPage() {
             </EmojiPicker.Root>
           </Box>}
         </Box> : entry?.icon && <Text fontSize="4xl" aria-label={`Entry emoji: ${entry.icon}`}>{entry.icon}</Text>}
-        <Text as="h1" fontSize={{ base: '2xl', md: '3xl' }} fontWeight="700">{new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { dateStyle: 'full' })}</Text>
+        {canEdit ? <Input variant="flushed" value={title} onChange={(event) => setTitle(event.target.value)} aria-label="Entry title" fontSize={{ base: '2xl', md: '3xl' }} fontWeight="700" /> : <Text as="h1" fontSize={{ base: '2xl', md: '3xl' }} fontWeight="700">{entry?.title || defaultTitle}</Text>}
       </HStack>
-      <Box ref={editorHolder} className="journal-editor" />
+      <Box ref={editorHolder} className="journal-editor" flex="1" />
       {!canEdit && !entry && <Text color="fg.muted">This entry has not been written yet.</Text>}
       {!canEdit && <Text color="fg.muted" fontSize="sm"> <Link to="/auth">Sign in</Link> to write your own entries.</Text>}
     </Stack>

@@ -31,6 +31,9 @@ export class Post {
   @Column({ type: 'varchar', length: 64, nullable: true })
   icon: string | null;
 
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  title: string | null;
+
   @Column({ type: 'jsonb', default: () => "'{}'::jsonb" })
   content: Record<string, unknown>;
 
