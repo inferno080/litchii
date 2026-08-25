@@ -9,3 +9,8 @@ body,
 body {
   min-height: 100vh;
 }
+
+button,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
