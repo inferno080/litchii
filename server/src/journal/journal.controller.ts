@@ -37,16 +37,22 @@ export class JournalController {
   @ApiOperation({ summary: 'List a user’s post summaries in a date range' })
   @ApiParam({ name: 'username', example: 'your_username' })
   @ApiBody({ type: DateRangeDto })
-  @ApiOkResponse({ description: 'Post summaries for the requested inclusive range.' })
+  @ApiOkResponse({
+    description: 'Post summaries for the requested inclusive range.',
+  })
   listPosts(@Param('username') username: string, @Body() range: DateRangeDto) {
     return this.journalService.listPosts(username, range);
   }
 
   @Get(':username/:date')
-  @ApiOperation({ summary: 'View one public journal entry and its comment tree' })
+  @ApiOperation({
+    summary: 'View one public journal entry and its comment tree',
+  })
   @ApiParam({ name: 'username', example: 'your_username' })
   @ApiParam({ name: 'date', example: '2026-08-24', description: 'YYYY-MM-DD' })
-  @ApiOkResponse({ description: 'The journal entry, author, and nested comments.' })
+  @ApiOkResponse({
+    description: 'The journal entry, author, and nested comments.',
+  })
   getPost(
     @Param('username') username: string,
     @Param('date') date: string,
@@ -73,7 +79,9 @@ export class JournalController {
 
   @Post(':username/:date/image')
   @UseGuards(SupabaseJwtGuard)
-  @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  @UseInterceptors(
+    FileInterceptor('image', { limits: { fileSize: 10 * 1024 * 1024 } }),
+  )
   @ApiBearerAuth('SupabaseAccessToken')
   @ApiOperation({ summary: 'Upload an image for a journal entry' })
   @ApiParam({ name: 'username', example: 'your_username' })

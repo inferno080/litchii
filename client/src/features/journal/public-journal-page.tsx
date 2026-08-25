@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Box, Button, HStack, SimpleGrid, Spinner, Stack, Text } from '@chakra-ui/react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ThemeToggle } from '../../components/ui/theme-toggle'
 import { toaster } from '../../components/ui/toaster'
 import { apiUrl, supabase } from '../../lib/supabase'
 
@@ -72,7 +73,10 @@ export function PublicJournalPage() {
     <Stack w="full" gap="8">
       <HStack justify="space-between" align="flex-start" borderBottomWidth="1px" borderColor="gray.200" pb="4">
         <Text fontSize={{ base: '2xl', md: '3xl' }} fontWeight="700">{username}'s space</Text>
-        {isLoggedIn ? <Button variant="outline" size="sm" onClick={handleSignOut} disabled={isSigningOut}>{isSigningOut ? 'Signing out...' : 'Sign out'}</Button> : <Button variant="outline" size="sm" onClick={() => navigate('/auth')}>Sign in</Button>}
+        <HStack gap="2">
+          <ThemeToggle />
+          {isLoggedIn ? <Button variant="outline" size="sm" onClick={handleSignOut} disabled={isSigningOut}>{isSigningOut ? 'Signing out...' : 'Sign out'}</Button> : <Button variant="outline" size="sm" onClick={() => navigate('/auth')}>Sign in</Button>}
+        </HStack>
       </HStack>
       <Stack gap="5" h="full" minH={{ base: 'calc(100vh - 12rem)', md: 'calc(100vh - 13rem)' }}>
           <HStack justify="space-between" align="center">
@@ -92,7 +96,7 @@ export function PublicJournalPage() {
                 const marker = post?.icon || '-'
                 return <Button key={dateKey} variant="outline" position="relative" justifyContent="flex-start" alignItems="flex-start" minH={{ base: '16', md: '24' }} p="3" fontSize="xs" onClick={() => navigate(`/${username}/${dateKey}`)}>
                   <Text>{index + 1}</Text>
-                  <Text position="absolute" top="50%" left="50%" transform="translate(-50%, -50%)" fontSize="lg">{marker}</Text>
+                  <Text position="absolute" top="50%" left="50%" transform="translate(-50%, -50%)" fontSize="4xl">{marker}</Text>
                 </Button>
               })}
             </SimpleGrid>

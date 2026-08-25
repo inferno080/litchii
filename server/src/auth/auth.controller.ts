@@ -1,5 +1,11 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from './current-user.decorator';
 import { CreateProfileDto } from './dto/create-profile.dto';
 import { SignInDto } from './dto/sign-in.dto';
@@ -13,9 +19,13 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('sign-in')
-  @ApiOperation({ summary: 'Sign in with Supabase email/password and receive a session' })
+  @ApiOperation({
+    summary: 'Sign in with Supabase email/password and receive a session',
+  })
   @ApiBody({ type: SignInDto })
-  @ApiOkResponse({ description: 'Supabase session, including access_token and refresh_token.' })
+  @ApiOkResponse({
+    description: 'Supabase session, including access_token and refresh_token.',
+  })
   signIn(@Body() dto: SignInDto) {
     return this.authService.signIn(dto);
   }

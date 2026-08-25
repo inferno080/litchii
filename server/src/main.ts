@@ -17,7 +17,9 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Litchii API')
-    .setDescription('Public journal, comments, and authenticated authoring API.')
+    .setDescription(
+      'Public journal, comments, and authenticated authoring API.',
+    )
     .setVersion('1.0')
     .addBearerAuth(
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Box, Button, Field, HStack, Image, Input, Stack, Text, Theme } from '@chakra-ui/react'
 import { useNavigate } from 'react-router-dom'
+import { ThemeToggle } from '../../components/ui/theme-toggle'
 import { useColorMode } from '../../components/ui/color-mode'
 import { toaster } from '../../components/ui/toaster'
 import { supabase } from '../../lib/supabase'
@@ -11,7 +12,7 @@ type AuthMode = 'sign-in' | 'sign-up'
 
 export function AuthPage() {
   const navigate = useNavigate()
-  const { colorMode, toggleColorMode } = useColorMode()
+  const { colorMode } = useColorMode()
   const [mode, setMode] = useState<AuthMode>('sign-in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -84,7 +85,7 @@ export function AuthPage() {
   const field = (label: string, child: ReactNode) => <Field.Root required><Field.Label>{label}</Field.Label>{child}</Field.Root>
 
   return <Theme appearance={colorMode}><Box minH="100vh" bg="bg.subtle" color="fg" px={{ base: '5', md: '8' }} py="20">
-    <Button position="fixed" top={{ base: '3', md: '5' }} right={{ base: '3', md: '5' }} variant="outline" colorPalette="gray" size="sm" onClick={toggleColorMode}>{colorMode === 'dark' ? 'Light' : 'Dark'}</Button>
+    <Box position="fixed" top={{ base: '3', md: '5' }} right={{ base: '3', md: '5' }}><ThemeToggle /></Box>
     <Stack as="main" maxW="lg" mx="auto" minH="calc(100vh - 10rem)" justify="center" gap="7">
       <Image src="/art/Litchi_Transparent_Big.PNG" alt="Litchi" w={{ base: '52', md: '64' }} mx="auto" />
       <HStack borderBottomWidth="1px" borderColor="border" gap="0"><Button flex="1" variant="plain" borderBottomWidth="2px" borderColor={!isSignUp ? 'fg' : 'transparent'} borderRadius="0" onClick={() => switchMode('sign-in')}>Sign in</Button><Button flex="1" variant="plain" borderBottomWidth="2px" borderColor={isSignUp ? 'fg' : 'transparent'} borderRadius="0" onClick={() => switchMode('sign-up')}>Sign up</Button></HStack>

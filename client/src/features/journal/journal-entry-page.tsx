@@ -5,8 +5,10 @@ import Header from '@editorjs/header'
 import ImageTool from '@editorjs/image'
 import LinkTool from '@editorjs/link'
 import List from '@editorjs/list'
+import { EmojiPicker } from 'frimousse'
 import { Box, Button, HStack, Spinner, Stack, Text } from '@chakra-ui/react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ThemeToggle } from '../../components/ui/theme-toggle'
 import { toaster } from '../../components/ui/toaster'
 import { apiUrl, supabase } from '../../lib/supabase'
 
@@ -21,6 +23,8 @@ export function JournalEntryPage() {
   const editor = useRef<EditorJS | null>(null)
   const [entry, setEntry] = useState<JournalEntry | null>(null)
   const [document, setDocument] = useState<OutputData>(emptyDocument)
+  const [icon, setIcon] = useState('')
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
   const [canEdit, setCanEdit] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -34,6 +38,7 @@ export function JournalEntryPage() {
           const loadedEntry = (await entryResponse.json()) as JournalEntry
           setEntry(loadedEntry)
           setDocument(loadedEntry.content)
+          setIcon(loadedEntry.icon ?? '')
         } else if (entryResponse.status !== 404) {
           throw new Error('Unable to load this journal entry.')
         }
@@ -109,10 +114,10 @@ export function JournalEntryPage() {
       const response = await fetch(`${apiUrl}/${encodeURIComponent(username)}/${date}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${data.session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, icon: icon || null }),
       })
       if (!response.ok) throw new Error('Unable to save this journal entry.')
-      setEntry((currentEntry) => currentEntry ?? { content, icon: null, author: { username } })
+      setEntry((currentEntry) => ({ ...(currentEntry ?? { author: { username } }), content, icon: icon || null }))
       toaster.create({ description: 'Journal entry saved.', type: 'success' })
     } catch (saveError) {
       toaster.create({ description: saveError instanceof Error ? saveError.message : 'Unable to save this journal entry.', type: 'error' })
@@ -128,12 +133,27 @@ export function JournalEntryPage() {
     <Stack maxW="4xl" mx="auto" gap="6">
       <HStack justify="space-between" borderBottomWidth="1px" borderColor="gray.200" pb="4">
         <Button variant="ghost" onClick={() => navigate(`/${username}`)}>&larr; Calendar</Button>
-        {canEdit && <Button onClick={saveEntry} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save'}</Button>}
+        <HStack gap="2">
+          <ThemeToggle />
+          {canEdit && <Button size="sm" onClick={saveEntry} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save'}</Button>}
+        </HStack>
       </HStack>
-      <Stack gap="1">
-        <Text fontSize="sm" color="fg.muted">{entry?.icon ?? 'Journal entry'}</Text>
+      <HStack gap="3" align="center">
+        {canEdit ? <Box position="relative">
+          <Button aria-label="Choose an emoji for this entry" className="journal-emoji-selector" fontSize="4xl" variant={icon ? 'ghost' : 'outline'} onClick={() => setIsEmojiPickerOpen((open) => !open)}>{icon || '+'}</Button>
+          {isEmojiPickerOpen && <Box className="journal-emoji-picker">
+            <EmojiPicker.Root onEmojiSelect={({ emoji }) => { setIcon(emoji); setIsEmojiPickerOpen(false) }}>
+              <EmojiPicker.Search />
+              <EmojiPicker.Viewport>
+                <EmojiPicker.Loading>Loading...</EmojiPicker.Loading>
+                <EmojiPicker.Empty>No emoji found.</EmojiPicker.Empty>
+                <EmojiPicker.List />
+              </EmojiPicker.Viewport>
+            </EmojiPicker.Root>
+          </Box>}
+        </Box> : entry?.icon && <Text fontSize="4xl" aria-label={`Entry emoji: ${entry.icon}`}>{entry.icon}</Text>}
         <Text as="h1" fontSize={{ base: '2xl', md: '3xl' }} fontWeight="700">{new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { dateStyle: 'full' })}</Text>
-      </Stack>
+      </HStack>
       <Box ref={editorHolder} className="journal-editor" />
       {!canEdit && !entry && <Text color="fg.muted">This entry has not been written yet.</Text>}
       {!canEdit && <Text color="fg.muted" fontSize="sm"> <Link to="/auth">Sign in</Link> to write your own entries.</Text>}

@@ -70,12 +70,12 @@ export class JournalService {
     });
 
     return posts.map((post) => ({
-        id: post.id,
-        date: post.entryDate,
-        icon: post.icon,
-        createdAt: post.createdAt,
-        updatedAt: post.updatedAt,
-      }));
+      id: post.id,
+      date: post.entryDate,
+      icon: post.icon,
+      createdAt: post.createdAt,
+      updatedAt: post.updatedAt,
+    }));
   }
 
   async getPost(username: string, date: string) {
@@ -112,6 +112,7 @@ export class JournalService {
       authorId: profile.id,
       entryDate: date,
     });
+    const previousContent = post?.content;
 
     if (post) {
       post.content = dto.content;
@@ -125,7 +126,11 @@ export class JournalService {
       });
     }
 
-    return this.postsRepository.save(post);
+    const savedPost = await this.postsRepository.save(post);
+    if (previousContent) {
+      await this.removeDeletedImages(previousContent, dto.content);
+    }
+    return savedPost;
   }
 
   async uploadImage(
@@ -145,21 +150,33 @@ export class JournalService {
       throw new BadRequestException('Images must be 10 MB or smaller');
     }
 
-    const extension = file.originalname.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+    const extension =
+      file.originalname
+        .split('.')
+        .pop()
+        ?.toLowerCase()
+        .replace(/[^a-z0-9]/g, '') || 'bin';
     const path = `${profile.username}/${date}/${crypto.randomUUID()}.${extension}`;
     const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
-    const serviceRoleKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY');
+    const serviceRoleKey = this.configService.get<string>(
+      'SUPABASE_SERVICE_ROLE_KEY',
+    );
     if (!supabaseUrl || !serviceRoleKey) {
       throw new InternalServerErrorException('Image storage is not configured');
     }
     this.storageClient ??= createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
-    const bucket = this.configService.get<string>('SUPABASE_STORAGE_BUCKET', 'journal-images');
-    const { error } = await this.storageClient.storage.from(bucket).upload(path, file.buffer, {
-      contentType: file.mimetype,
-      upsert: false,
-    });
+    const bucket = this.configService.get<string>(
+      'SUPABASE_STORAGE_BUCKET',
+      'journal-images',
+    );
+    const { error } = await this.storageClient.storage
+      .from(bucket)
+      .upload(path, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
     if (error) throw new InternalServerErrorException('Unable to store image');
 
     const { data } = this.storageClient.storage.from(bucket).getPublicUrl(path);
@@ -176,9 +193,13 @@ export class JournalService {
     const profile = await this.getProfileForUser(user);
 
     if (dto.parentId) {
-      const parent = await this.commentsRepository.findOneBy({ id: dto.parentId });
+      const parent = await this.commentsRepository.findOneBy({
+        id: dto.parentId,
+      });
       if (!parent || parent.postId !== post.id) {
-        throw new BadRequestException('parentId must belong to this journal entry');
+        throw new BadRequestException(
+          'parentId must belong to this journal entry',
+        );
       }
     }
 
@@ -210,7 +231,9 @@ export class JournalService {
   ) {
     const post = await this.getPostByUsernameAndDate(username, date);
     const profile = await this.getProfileForUser(user);
-    const comment = await this.commentsRepository.findOneBy({ id: dto.commentId });
+    const comment = await this.commentsRepository.findOneBy({
+      id: dto.commentId,
+    });
     if (!comment || comment.postId !== post.id) {
       throw new NotFoundException('Comment not found for this journal entry');
     }
@@ -233,7 +256,10 @@ export class JournalService {
     };
   }
 
-  private async getPostByUsernameAndDate(username: string, date: string): Promise<Post> {
+  private async getPostByUsernameAndDate(
+    username: string,
+    date: string,
+  ): Promise<Post> {
     this.assertDate(date, 'date');
     const profile = await this.getProfileByUsername(username);
     const post = await this.postsRepository.findOne({
@@ -259,15 +285,74 @@ export class JournalService {
   private async getProfileForUser(user: AuthenticatedUser): Promise<Profile> {
     const profile = await this.profilesRepository.findOneBy({ id: user.id });
     if (!profile) {
-      throw new ForbiddenException('Create a profile before writing posts or comments');
+      throw new ForbiddenException(
+        'Create a profile before writing posts or comments',
+      );
     }
     return profile;
   }
 
   private assertUsernameOwnership(username: string, profile: Profile): void {
     if (username.toLowerCase() !== profile.username) {
-      throw new ForbiddenException('You can only edit your own journal entries');
+      throw new ForbiddenException(
+        'You can only edit your own journal entries',
+      );
     }
+  }
+
+  private async removeDeletedImages(
+    previousContent: Record<string, unknown>,
+    nextContent: Record<string, unknown>,
+  ): Promise<void> {
+    const bucket = this.configService.get<string>(
+      'SUPABASE_STORAGE_BUCKET',
+      'journal-images',
+    );
+    const serviceRoleKey = this.configService.get<string>(
+      'SUPABASE_SERVICE_ROLE_KEY',
+    );
+    const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
+    if (!serviceRoleKey || !supabaseUrl) return;
+
+    this.storageClient ??= createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const previousImages = this.getStoredImagePaths(
+      previousContent,
+      bucket,
+      supabaseUrl,
+    );
+    const nextImages = this.getStoredImagePaths(
+      nextContent,
+      bucket,
+      supabaseUrl,
+    );
+    const deletedImages = [...previousImages].filter(
+      (path) => !nextImages.has(path),
+    );
+    if (deletedImages.length === 0) return;
+
+    await this.storageClient.storage.from(bucket).remove(deletedImages);
+  }
+
+  private getStoredImagePaths(
+    content: Record<string, unknown>,
+    bucket: string,
+    supabaseUrl: string,
+  ): Set<string> {
+    const paths = new Set<string>();
+    const publicPrefix = `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/public/${bucket}/`;
+    const visit = (value: unknown) => {
+      if (typeof value === 'string' && value.startsWith(publicPrefix)) {
+        paths.add(decodeURIComponent(value.slice(publicPrefix.length)));
+      } else if (Array.isArray(value)) {
+        value.forEach(visit);
+      } else if (value && typeof value === 'object') {
+        Object.values(value).forEach(visit);
+      }
+    };
+    visit(content);
+    return paths;
   }
 
   private assertDate(value: string, name: string): void {
@@ -276,18 +361,28 @@ export class JournalService {
     }
 
     const parsed = new Date(`${value}T00:00:00.000Z`);
-    if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    if (
+      Number.isNaN(parsed.getTime()) ||
+      parsed.toISOString().slice(0, 10) !== value
+    ) {
       throw new BadRequestException(`${name} must be a valid calendar date`);
     }
   }
 
-  private async buildCommentTree(comments: Comment[]): Promise<CommentTreeNode[]> {
-    const totals = await this.getVoteTotals(comments.map((comment) => comment.id));
+  private async buildCommentTree(
+    comments: Comment[],
+  ): Promise<CommentTreeNode[]> {
+    const totals = await this.getVoteTotals(
+      comments.map((comment) => comment.id),
+    );
     const nodes = new Map<string, CommentTreeNode>();
     const roots: CommentTreeNode[] = [];
 
     for (const comment of comments) {
-      const voteTotals = totals.get(comment.id) ?? { likeCount: 0, dislikeCount: 0 };
+      const voteTotals = totals.get(comment.id) ?? {
+        likeCount: 0,
+        dislikeCount: 0,
+      };
       nodes.set(comment.id, {
         id: comment.id,
         parentId: comment.parentId,
@@ -311,9 +406,9 @@ export class JournalService {
     return roots;
   }
 
-  private async getVoteTotals(commentIds: string[]): Promise<
-    Map<string, { likeCount: number; dislikeCount: number }>
-  > {
+  private async getVoteTotals(
+    commentIds: string[],
+  ): Promise<Map<string, { likeCount: number; dislikeCount: number }>> {
     if (commentIds.length === 0) {
       return new Map();
     }
@@ -321,16 +416,23 @@ export class JournalService {
     const rows = await this.votesRepository
       .createQueryBuilder('vote')
       .select('vote.comment_id', 'commentId')
-      .addSelect("COUNT(*) FILTER (WHERE vote.value = 1)", 'likeCount')
-      .addSelect("COUNT(*) FILTER (WHERE vote.value = -1)", 'dislikeCount')
+      .addSelect('COUNT(*) FILTER (WHERE vote.value = 1)', 'likeCount')
+      .addSelect('COUNT(*) FILTER (WHERE vote.value = -1)', 'dislikeCount')
       .where('vote.comment_id IN (:...commentIds)', { commentIds })
       .groupBy('vote.comment_id')
-      .getRawMany<{ commentId: string; likeCount: string; dislikeCount: string }>();
+      .getRawMany<{
+        commentId: string;
+        likeCount: string;
+        dislikeCount: string;
+      }>();
 
     return new Map(
       rows.map((row) => [
         row.commentId,
-        { likeCount: Number(row.likeCount), dislikeCount: Number(row.dislikeCount) },
+        {
+          likeCount: Number(row.likeCount),
+          dislikeCount: Number(row.dislikeCount),
+        },
       ]),
     );
   }

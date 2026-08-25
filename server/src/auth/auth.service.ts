@@ -113,7 +113,8 @@ export class AuthService {
       driverError?: { code?: string };
     };
     return (
-      databaseError.code === '23505' || databaseError.driverError?.code === '23505'
+      databaseError.code === '23505' ||
+      databaseError.driverError?.code === '23505'
     );
   }
 }

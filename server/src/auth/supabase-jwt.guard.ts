@@ -69,7 +69,10 @@ export class SupabaseJwtGuard implements CanActivate {
 
     const { payload } = await jwtVerify(token, this.jwks, {
       issuer: `${supabaseUrl}/auth/v1`,
-      audience: this.configService.get('SUPABASE_JWT_AUDIENCE', 'authenticated'),
+      audience: this.configService.get(
+        'SUPABASE_JWT_AUDIENCE',
+        'authenticated',
+      ),
     });
 
     return this.toAuthenticatedUser(payload);
