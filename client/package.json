@@ -11,6 +11,11 @@
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.1",
+    "@editorjs/editorjs": "^2.31.6",
+    "@editorjs/header": "^2.8.9",
+    "@editorjs/image": "^2.10.3",
+    "@editorjs/link": "^2.6.2",
+    "@editorjs/list": "^2.0.9",
     "@emotion/react": "^11.14.0",
     "@supabase/supabase-js": "^2.112.4",
     "@tanstack/react-query": "^5.102.2",

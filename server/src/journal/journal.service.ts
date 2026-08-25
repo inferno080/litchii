@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  InternalServerErrorException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -15,6 +16,8 @@ import { CastVoteDto } from './dto/cast-vote.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { DateRangeDto } from './dto/date-range.dto';
 import { UpsertPostDto } from './dto/upsert-post.dto';
+import { ConfigService } from '@nestjs/config';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 interface CommentTreeNode {
   id: string;
@@ -25,6 +28,13 @@ interface CommentTreeNode {
   likeCount: number;
   dislikeCount: number;
   children: CommentTreeNode[];
+}
+
+export interface UploadedImageFile {
+  buffer: Buffer;
+  mimetype: string;
+  originalname: string;
+  size: number;
 }
 
 @Injectable()
@@ -38,7 +48,10 @@ export class JournalService {
     private readonly commentsRepository: Repository<Comment>,
     @InjectRepository(CommentVote)
     private readonly votesRepository: Repository<CommentVote>,
+    private readonly configService: ConfigService,
   ) {}
+
+  private storageClient?: SupabaseClient;
 
   async listPosts(username: string, range: DateRangeDto) {
     this.assertDate(range.startDate, 'startDate');
@@ -113,6 +126,44 @@ export class JournalService {
     }
 
     return this.postsRepository.save(post);
+  }
+
+  async uploadImage(
+    username: string,
+    date: string,
+    user: AuthenticatedUser,
+    file: UploadedImageFile | undefined,
+  ) {
+    this.assertDate(date, 'date');
+    const profile = await this.getProfileForUser(user);
+    this.assertUsernameOwnership(username, profile);
+    if (!file) throw new BadRequestException('An image file is required');
+    if (!file.mimetype.startsWith('image/')) {
+      throw new BadRequestException('Only image files are supported');
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      throw new BadRequestException('Images must be 10 MB or smaller');
+    }
+
+    const extension = file.originalname.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+    const path = `${profile.username}/${date}/${crypto.randomUUID()}.${extension}`;
+    const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
+    const serviceRoleKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new InternalServerErrorException('Image storage is not configured');
+    }
+    this.storageClient ??= createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const bucket = this.configService.get<string>('SUPABASE_STORAGE_BUCKET', 'journal-images');
+    const { error } = await this.storageClient.storage.from(bucket).upload(path, file.buffer, {
+      contentType: file.mimetype,
+      upsert: false,
+    });
+    if (error) throw new InternalServerErrorException('Unable to store image');
+
+    const { data } = this.storageClient.storage.from(bucket).getPublicUrl(path);
+    return { success: 1, file: { url: data.publicUrl } };
   }
 
   async createComment(

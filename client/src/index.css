@@ -14,3 +14,13 @@ button,
 input {
   -webkit-tap-highlight-color: transparent;
 }
+
+.journal-editor {
+  min-height: 24rem;
+  padding: 1rem 0;
+}
+
+.journal-editor .ce-block__content,
+.journal-editor .ce-toolbar__content {
+  max-width: 100%;
+}

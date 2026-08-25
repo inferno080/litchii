@@ -89,9 +89,10 @@ export function PublicJournalPage() {
               {Array.from({ length: daysInMonth }, (_, index) => {
                 const dateKey = formatDate(new Date(monthStart.getFullYear(), monthStart.getMonth(), index + 1))
                 const post = postsByDate.get(dateKey)
-                return <Button key={dateKey} variant="outline" position="relative" justifyContent="flex-start" alignItems="flex-start" minH={{ base: '16', md: '24' }} p="3" fontSize="xs">
+                const marker = post?.icon || '-'
+                return <Button key={dateKey} variant="outline" position="relative" justifyContent="flex-start" alignItems="flex-start" minH={{ base: '16', md: '24' }} p="3" fontSize="xs" onClick={() => navigate(`/${username}/${dateKey}`)}>
                   <Text>{index + 1}</Text>
-                  <Text position="absolute" top="50%" left="50%" transform="translate(-50%, -50%)" fontSize="lg">{post?.icon ?? '-'}</Text>
+                  <Text position="absolute" top="50%" left="50%" transform="translate(-50%, -50%)" fontSize="lg">{marker}</Text>
                 </Button>
               })}
             </SimpleGrid>

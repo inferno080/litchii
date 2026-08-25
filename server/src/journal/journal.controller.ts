@@ -4,8 +4,11 @@ import {
   Get,
   Param,
   Post,
+  UploadedFile,
+  UseInterceptors,
   UseGuards,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -23,6 +26,7 @@ import { CreateCommentDto } from './dto/create-comment.dto';
 import { DateRangeDto } from './dto/date-range.dto';
 import { UpsertPostDto } from './dto/upsert-post.dto';
 import { JournalService } from './journal.service';
+import type { UploadedImageFile } from './journal.service';
 
 @Controller()
 @ApiTags('Journals')
@@ -65,6 +69,22 @@ export class JournalController {
     @Body() dto: UpsertPostDto,
   ) {
     return this.journalService.upsertPost(username, date, user, dto);
+  }
+
+  @Post(':username/:date/image')
+  @UseGuards(SupabaseJwtGuard)
+  @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  @ApiBearerAuth('SupabaseAccessToken')
+  @ApiOperation({ summary: 'Upload an image for a journal entry' })
+  @ApiParam({ name: 'username', example: 'your_username' })
+  @ApiParam({ name: 'date', example: '2026-08-24', description: 'YYYY-MM-DD' })
+  uploadImage(
+    @Param('username') username: string,
+    @Param('date') date: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFile() file: UploadedImageFile,
+  ) {
+    return this.journalService.uploadImage(username, date, user, file);
   }
 
   @Post(':username/:date/comment')
