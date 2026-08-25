@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Box, Button, Field, HStack, Image, Input, Stack, Text, Theme } from '@chakra-ui/react'
+import { useNavigate } from 'react-router-dom'
 import { useColorMode } from '../../components/ui/color-mode'
 import { toaster } from '../../components/ui/toaster'
 import { supabase } from '../../lib/supabase'
-import { createProfile } from './profile-api'
+import { createProfile, getCurrentProfile } from './profile-api'
 
 type AuthMode = 'sign-in' | 'sign-up'
 
 export function AuthPage() {
+  const navigate = useNavigate()
   const { colorMode, toggleColorMode } = useColorMode()
   const [mode, setMode] = useState<AuthMode>('sign-in')
   const [email, setEmail] = useState('')
@@ -27,14 +29,17 @@ export function AuthPage() {
       if (!data.session) return
       const emailKey = data.session.user.email ? `litchii:pending-username:${data.session.user.email.toLowerCase()}` : null
       const pendingUsername = (emailKey ? localStorage.getItem(emailKey) : null) ?? localStorage.getItem('litchii:pending-google-username')
-      if (!pendingUsername) return
-      await createProfile(data.session.access_token, pendingUsername)
-      if (emailKey) localStorage.removeItem(emailKey)
-      localStorage.removeItem('litchii:pending-google-username')
-      notify('Your profile is ready.')
+      if (pendingUsername) {
+        await createProfile(data.session.access_token, pendingUsername)
+        if (emailKey) localStorage.removeItem(emailKey)
+        localStorage.removeItem('litchii:pending-google-username')
+        notify('Your profile is ready.')
+      }
+      const currentProfile = await getCurrentProfile(data.session.access_token)
+      if (currentProfile.profile) navigate(`/${currentProfile.profile.username}`, { replace: true })
     }
     void completePendingProfile().catch((error: unknown) => notify(error instanceof Error ? error.message : 'Unable to create your profile.', 'error'))
-  }, [])
+  }, [navigate])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -59,6 +64,9 @@ export function AuthPage() {
         if (error) throw error
         const pendingUsername = localStorage.getItem(`litchii:pending-username:${email.toLowerCase()}`)
         if (pendingUsername) { await createProfile(data.session.access_token, pendingUsername); localStorage.removeItem(`litchii:pending-username:${email.toLowerCase()}`) }
+        const currentProfile = await getCurrentProfile(data.session.access_token)
+        if (!currentProfile.profile) throw new Error('Your profile is not ready yet.')
+        navigate(`/${currentProfile.profile.username}`, { replace: true })
         notify('Signed in successfully.')
       }
     } catch (error) { notify(error instanceof Error ? error.message : 'Something went wrong. Please try again.', 'error') } finally { setIsSubmitting(false) }

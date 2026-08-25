@@ -11,3 +11,11 @@ export async function createProfile(accessToken: string, username: string) {
     throw new Error(error.message ?? 'Unable to create your profile.')
   }
 }
+
+export async function getCurrentProfile(accessToken: string) {
+  const response = await fetch(`${apiUrl}/auth/me`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!response.ok) throw new Error('Unable to load your profile.')
+  return (await response.json()) as { profile: { username: string } | null }
+}
